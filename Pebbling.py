@@ -83,7 +83,6 @@ def load_daily_cards():
     # 自动补全 _filename 字段（如果有 filename 字段则用之，否则用 id/date 拼接）
     for card in cards:
         if "_filename" not in card or not card["_filename"]:
-            # 尝试用 date+id 拼接
             date = card.get("date", "nodate")
             cid = card.get("id", "noid")
             card["_filename"] = f"{date}_word_{cid}.json"
