@@ -684,10 +684,12 @@ for i, state in enumerate(daily_states):
                         # (确保下面的代码有正确的缩进，在 try 块内部)
                         saved_count = 0
                         all_cards_reloaded = load_daily_cards() # 加载最新数据
-                        # 找出需要更新的卡片的索引和原始信息
                         updates_to_perform = []
                         for idx, card in enumerate(all_cards_reloaded):
+                            if not card:
+                                continue
                             if card.get("status") == "待推送":
+                                data = card.get("data") or {}
                                 updates_to_perform.append({
                                     'original_info': {
                                         "id": card.get("id"),
@@ -696,24 +698,19 @@ for i, state in enumerate(daily_states):
                                     },
                                     'updated_data': {
                                         "title": card.get("title"),
-                                        "data": card.get("data"),
-                                        "status": "已推送" # 直接设置新状态
+                                        "data": data,
+                                        "status": "已推送"
                                     },
-                                    'original_index': idx # 记录原始索引，虽然新save函数不用了，但保留可能有用
+                                    'original_index': idx
                                 })
-
-                        # 遍历并保存更新 (确保这个 for 循环有正确的缩进)
                         for update in updates_to_perform:
-                            # 使用修改后的 save_daily_card 函数 (假设你之前已经替换了)
-                            # 直接传递 original_info，不依赖 session state
                             if save_daily_card(
                                 update['updated_data'],
                                 is_editing=True,
-                                original_card_info=update['original_info'] # 传递原始信息
+                                original_card_info=update['original_info']
                             ):
                                 saved_count += 1
                             else:
-                                # 如果保存失败，记录一下
                                 st.warning(f"更新卡片 ID {update['original_info'].get('id')} 状态失败。")
 
                         # 显示最终结果 (确保这部分有正确的缩进)
@@ -838,10 +835,10 @@ for i, state in enumerate(tiqiao_states):
                         # --- 邮件发送成功，开始更新状态 ---
                         saved_count = 0
                         all_cards_reloaded = load_tiqiao_cards() # 重新加载以获取最新列表
-
-                        # 收集需要更新的信息
                         updates_to_perform = []
                         for idx, card in enumerate(all_cards_reloaded):
+                            if not card:
+                                continue
                             if card.get("status") == "待推送":
                                 updates_to_perform.append({
                                     'original_info': {
@@ -849,13 +846,13 @@ for i, state in enumerate(tiqiao_states):
                                         "date": card.get("date"),
                                         "filename": card.get("_filename")
                                     },
-                                    'updated_data': { # 提供保存所需的所有字段
+                                    'updated_data': {
                                         "orig_cn": card.get("orig_cn"),
                                         "orig_en": card.get("orig_en"),
                                         "meaning": card.get("meaning"),
                                         "recommend": card.get("recommend"),
                                         "qtype": card.get("qtype"),
-                                        "status": "已推送" # 设置新状态
+                                        "status": "已推送"
                                     }
                                 })
 
@@ -864,7 +861,7 @@ for i, state in enumerate(tiqiao_states):
                             if save_tiqiao_card(
                                 update['updated_data'],
                                 is_editing=True,
-                                original_card_info=update['original_info'] # 传递原始信息
+                                original_card_info=update['original_info']
                             ):
                                 saved_count += 1
                             else:
