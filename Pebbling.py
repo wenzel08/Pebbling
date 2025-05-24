@@ -90,8 +90,8 @@ def load_daily_cards():
 
 # --- Daily Card 删除函数 ---
 def delete_daily_card(card_id):
-    st.write("尝试删除 id:", card_id, "类型:", type(card_id))
-    print("尝试删除 id:", card_id, "类型:", type(card_id))
+    st.write(f"尝试删除 id: {card_id} 类型: {str(type(card_id))}")
+    print(f"尝试删除 id: {card_id} 类型: {str(type(card_id))}")
     res = supabase.table("daily_cards").delete().eq("id", card_id).execute()
     st.write("删除返回：", res)
     print("删除返回：", res)
@@ -400,8 +400,8 @@ def load_tiqiao_cards():
 
 # --- Tiqiao Card 删除函数 ---
 def delete_tiqiao_card(card_id):
-    st.write("尝试删除 id:", card_id, "类型:", type(card_id))
-    print("尝试删除 id:", card_id, "类型:", type(card_id))
+    st.write(f"尝试删除 id: {card_id} 类型: {str(type(card_id))}")
+    print(f"尝试删除 id: {card_id} 类型: {str(type(card_id))}")
     res = supabase.table("tiqiao_cards").delete().eq("id", card_id).execute()
     st.write("删除返回：", res)
     print("删除返回：", res)
