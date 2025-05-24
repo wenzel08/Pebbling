@@ -90,14 +90,16 @@ def load_daily_cards():
 
 # --- Daily Card 删除函数 ---
 def delete_daily_card(card_id):
-    st.write(f"尝试删除 id: {card_id} 类型: {str(type(card_id))}")
-    print(f"尝试删除 id: {card_id} 类型: {str(type(card_id))}")
+    msg = f"尝试删除 id: {card_id} 类型: {str(type(card_id))}"
+    st.session_state['last_delete_debug'] = msg
     res = supabase.table("daily_cards").delete().eq("id", card_id).execute()
-    st.write("删除返回：", res)
-    print("删除返回：", res)
+    st.session_state['last_delete_result'] = str(res)
     if hasattr(res, "error") and res.error:
-        st.error(f"Supabase 删除失败: {res.error}")
+        st.session_state['last_delete_error'] = f"Supabase 删除失败: {res.error}"
+        st.session_state['last_delete_success'] = False
         return False
+    st.session_state['last_delete_error'] = ''
+    st.session_state['last_delete_success'] = True
     return True
 
 # --- 用这个完整的新函数替换掉你原来的 save_daily_card 函数 ---
@@ -262,7 +264,6 @@ def scrape_merriam_webster():
     except Exception as e:
         st.error(f"Merriam 抓取失败：{e}")
         return False
-
 # --- Daily Card Sidebar Section ---
 st.sidebar.title("📝 编辑区")
 st.sidebar.divider()
@@ -400,14 +401,16 @@ def load_tiqiao_cards():
 
 # --- Tiqiao Card 删除函数 ---
 def delete_tiqiao_card(card_id):
-    st.write(f"尝试删除 id: {card_id} 类型: {str(type(card_id))}")
-    print(f"尝试删除 id: {card_id} 类型: {str(type(card_id))}")
+    msg = f"尝试删除 id: {card_id} 类型: {str(type(card_id))}"
+    st.session_state['last_delete_debug'] = msg
     res = supabase.table("tiqiao_cards").delete().eq("id", card_id).execute()
-    st.write("删除返回：", res)
-    print("删除返回：", res)
+    st.session_state['last_delete_result'] = str(res)
     if hasattr(res, "error") and res.error:
-        st.error(f"Supabase 删除失败: {res.error}")
+        st.session_state['last_delete_error'] = f"Supabase 删除失败: {res.error}"
+        st.session_state['last_delete_success'] = False
         return False
+    st.session_state['last_delete_error'] = ''
+    st.session_state['last_delete_success'] = True
     return True
 
 def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
@@ -636,6 +639,10 @@ with st.sidebar.expander("🧹 清理重复推敲卡片"):
 st.divider()
 st.header("📖 每日词卡列表")
 
+# --- 在主界面顶部增加刷新按钮 ---
+if st.button("🔄 刷新页面", key="refresh_page_button"):
+    st.rerun()
+
 # --- Daily Card Main Area Display ---
 all_daily_cards = load_daily_cards()
 daily_states = ["所有","未审阅","已审阅","待推送","已推送"]
@@ -778,11 +785,21 @@ for i, state in enumerate(daily_states):
                 col2.button("✏️", key=edit_button_key, on_click=daily_start_edit, args=(original_idx, all_daily_cards))
                 if col2.button("🗑️", key=delete_button_key):
                     if delete_daily_card(card.get("id")):
-                        st.success(f"删除词卡 ID {card.get('id')} 成功")
-                        st.rerun()
+                        st.success(f"删除词卡 ID {card.get('id')} 成功（请点击上方刷新按钮刷新列表）")
                     else:
-                        st.error(f"删除词卡 ID {card.get('id')} 失败")
+                        st.error(f"删除词卡 ID {card.get('id')} 失败（请查看上方调试信息）")
 
+if 'last_delete_debug' in st.session_state:
+    st.info(st.session_state['last_delete_debug'])
+if 'last_delete_result' in st.session_state:
+    st.info(st.session_state['last_delete_result'])
+if 'last_delete_error' in st.session_state and st.session_state['last_delete_error']:
+    st.error(st.session_state['last_delete_error'])
+if 'last_delete_success' in st.session_state:
+    if st.session_state['last_delete_success']:
+        st.success('删除操作成功！')
+    elif 'last_delete_error' in st.session_state and st.session_state['last_delete_error']:
+        st.error(st.session_state['last_delete_error'])
 
 st.divider()
 st.header("✍️ 推敲词卡列表")
@@ -928,11 +945,14 @@ for i, state in enumerate(tiqiao_states):
             col2.button("✏️", key=edit_button_key, on_click=tiqiao_start_edit, args=(original_idx, all_tiqiao_cards))
             if col2.button("🗑️", key=delete_button_key):
                  if delete_tiqiao_card(card.get("id")):
-                      st.success(f"删除推敲卡片 ID {card.get('id')} 成功")
-                      if st.session_state.tiqiao_edit_index == original_idx:
-                          tiqiao_cancel_edit()
-                      st.rerun()
+                      st.success(f"删除推敲卡片 ID {card.get('id')} 成功（请点击上方刷新按钮刷新列表）")
                  else:
-                      st.error(f"删除推敲卡片 ID {card.get('id')} 失败")
+                      st.error(f"删除推敲卡片 ID {card.get('id')} 失败（请查看上方调试信息）")
             
+# --- 删除后清理调试信息的按钮 ---
+if st.button("🧹 清除调试信息", key="clear_debug_button"):
+    for k in ['last_delete_debug','last_delete_result','last_delete_error','last_delete_success']:
+        if k in st.session_state:
+            del st.session_state[k]
+
 # --- 脚本文件结束 ---
