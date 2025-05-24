@@ -765,12 +765,11 @@ for i, state in enumerate(daily_states):
 
                 col2.button("✏️", key=edit_button_key, on_click=daily_start_edit, args=(original_idx, all_daily_cards))
                 if col2.button("🗑️", key=delete_button_key):
-                     fname = card.get("_filename")
-                     if fname:
-                         fp = os.path.join(DAILY_WORD_PATH, fname)
-                         if os.path.exists(fp): os.remove(fp); st.success(f"删除 {fname}"); st.rerun()
-                         else: st.warning(f"文件 {fname} 未找到")
-                     else: st.error("缺少文件名无法删除")
+                    if delete_daily_card(card.get("id")):
+                        st.success(f"删除词卡 ID {card.get('id')} 成功")
+                        st.rerun()
+                    else:
+                        st.error(f"删除词卡 ID {card.get('id')} 失败")
 
 
 st.divider()
@@ -925,3 +924,11 @@ for i, state in enumerate(tiqiao_states):
                       st.error(f"删除推敲卡片 ID {card.get('id')} 失败")
             
 # --- 脚本文件结束 ---
+
+# --- Daily Card 删除函数 ---
+def delete_daily_card(card_id):
+    res = supabase.table("daily_cards").delete().eq("id", card_id).execute()
+    if hasattr(res, "error") and res.error:
+        st.error(f"Supabase 删除失败: {res.error}")
+        return False
+    return True
