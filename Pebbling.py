@@ -391,10 +391,17 @@ for key in tiqiao_form_fields:
 
 # --- Tiqiao Card Utilities ---
 
-
 def load_tiqiao_cards():
     res = supabase.table("tiqiao_cards").select("*").execute()
     return res.data if res.data else []
+
+# --- Tiqiao Card 删除函数 ---
+def delete_tiqiao_card(card_id):
+    res = supabase.table("tiqiao_cards").delete().eq("id", card_id).execute()
+    if hasattr(res, "error") and res.error:
+        st.error(f"Supabase 删除失败: {res.error}")
+        return False
+    return True
 
 def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
     if is_editing and original_card_info:
@@ -428,13 +435,6 @@ def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
             st.error(f"Supabase 插入失败: {res.error}")
             return False
         return True
-
-def delete_tiqiao_card(card_id):
-    res = supabase.table("tiqiao_cards").delete().eq("id", card_id).execute()
-    if hasattr(res, "error") and res.error:
-        st.error(f"Supabase 删除失败: {res.error}")
-        return False
-    return True
 
 def remove_tiqiao_duplicates():
     cards = load_tiqiao_cards()
@@ -929,11 +929,3 @@ for i, state in enumerate(tiqiao_states):
                       st.error(f"删除推敲卡片 ID {card.get('id')} 失败")
             
 # --- 脚本文件结束 ---
-
-# --- Daily Card 删除函数 ---
-def delete_daily_card(card_id):
-    res = supabase.table("daily_cards").delete().eq("id", card_id).execute()
-    if hasattr(res, "error") and res.error:
-        st.error(f"Supabase 删除失败: {res.error}")
-        return False
-    return True
