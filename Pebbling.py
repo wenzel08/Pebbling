@@ -79,7 +79,15 @@ for key in daily_form_fields:
 # --- Daily Card Utilities ---
 def load_daily_cards():
     res = supabase.table("daily_cards").select("*").execute()
-    return res.data if res.data else []
+    cards = res.data if res.data else []
+    # 自动补全 _filename 字段（如果有 filename 字段则用之，否则用 id/date 拼接）
+    for card in cards:
+        if "_filename" not in card or not card["_filename"]:
+            # 尝试用 date+id 拼接
+            date = card.get("date", "nodate")
+            cid = card.get("id", "noid")
+            card["_filename"] = f"{date}_word_{cid}.json"
+    return cards
 
 # --- 用这个完整的新函数替换掉你原来的 save_daily_card 函数 ---
 def save_daily_card(card_data, is_editing=False, original_card_info=None):
@@ -97,7 +105,10 @@ def save_daily_card(card_data, is_editing=False, original_card_info=None):
             "date": card_data.get("date", original_card_info.get("date"))
         }
         res = supabase.table("daily_cards").update(update_data).eq("id", card_id).execute()
-        return res.status_code == 200
+        if hasattr(res, "error") and res.error:
+            st.error(f"Supabase 更新失败: {res.error}")
+            return False
+        return True
     else:
         insert_data = {
             "title": card_data.get("title", ""),
@@ -110,7 +121,10 @@ def save_daily_card(card_data, is_editing=False, original_card_info=None):
             "date": card_data.get("date", datetime.date.today().isoformat())
         }
         res = supabase.table("daily_cards").insert(insert_data).execute()
-        return res.status_code == 201
+        if hasattr(res, "error") and res.error:
+            st.error(f"Supabase 插入失败: {res.error}")
+            return False
+        return True
 # --- 添加这个新函数 ---
 def safe_strip(value):
     return str(value).strip() if value is not None else ""
@@ -387,7 +401,10 @@ def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
             "date": card_data.get("date", original_card_info.get("date"))
         }
         res = supabase.table("tiqiao_cards").update(update_data).eq("id", card_id).execute()
-        return res.status_code == 200
+        if hasattr(res, "error") and res.error:
+            st.error(f"Supabase 更新失败: {res.error}")
+            return False
+        return True
     else:
         insert_data = {
             "orig_cn": card_data.get("orig_cn", ""),
@@ -399,12 +416,18 @@ def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
             "date": card_data.get("date", datetime.date.today().isoformat())
         }
         res = supabase.table("tiqiao_cards").insert(insert_data).execute()
-        return res.status_code == 201
-# --- 函数替换结束 ---
+        if hasattr(res, "error") and res.error:
+            st.error(f"Supabase 插入失败: {res.error}")
+            return False
+        return True
 
 def delete_tiqiao_card(card_id):
     res = supabase.table("tiqiao_cards").delete().eq("id", card_id).execute()
-    return res.status_code == 200
+    if hasattr(res, "error") and res.error:
+        st.error(f"Supabase 删除失败: {res.error}")
+        return False
+    return True
+
 def remove_tiqiao_duplicates():
     cards = load_tiqiao_cards()
     seen_content = set()
