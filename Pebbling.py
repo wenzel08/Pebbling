@@ -90,7 +90,9 @@ def load_daily_cards():
 
 # --- Daily Card 删除函数 ---
 def delete_daily_card(card_id):
+    st.write("尝试删除 id:", card_id)
     res = supabase.table("daily_cards").delete().eq("id", card_id).execute()
+    st.write("删除返回：", res)
     if hasattr(res, "error") and res.error:
         st.error(f"Supabase 删除失败: {res.error}")
         return False
