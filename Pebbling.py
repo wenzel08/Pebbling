@@ -10,6 +10,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pathlib import Path
+from supabase import create_client, Client
 
 # --- Configuration ---
 st.set_page_config(layout="wide")
@@ -55,6 +56,9 @@ except Exception as e: # 捕获其他潜在错误
 # SECTION 1: DAILY WORD CARD (每日词卡)
 # ================================================
 
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["key"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- Daily Card Session State ---
 # Top of Script - Revised Initialization
@@ -74,91 +78,39 @@ for key in daily_form_fields:
         st.session_state[key] = "" if key != "daily_status" else "未审阅"
 # --- Daily Card Utilities ---
 def load_daily_cards():
-    cards = []
-    word_path_obj = Path(DAILY_WORD_PATH)
-    for fname_path in sorted(word_path_obj.glob("*.json")):
-        try:
-            with open(fname_path, "r", encoding="utf-8") as f:
-                card = json.load(f)
-            card["_filename"] = fname_path.name
-            cards.append(card)
-        except Exception as e:
-            st.warning(f"加载每日词卡 {fname_path.name} 失败: {e}")
-    return cards
+    res = supabase.table("daily_cards").select("*").execute()
+    return res.data if res.data else []
 
 # --- 用这个完整的新函数替换掉你原来的 save_daily_card 函数 ---
-def save_daily_card(card_data, is_editing=False, original_card_info=None): # 添加了 original_card_info
+def save_daily_card(card_data, is_editing=False, original_card_info=None):
     """保存新的或更新现有的每日词卡。"""
-    card_id = None
-    card_date = None
-    original_filename = None
-    card_to_save = {
-        "id": card_id,
-        "date": card_date,
-        "title": card_data.get("title", ""),
-        "data": card_data.get("data", {}),  # 确保 data 存在且是字典
-        "status": card_data.get("status", "未审阅")
-    }
-    if is_editing:
-        if original_card_info and isinstance(original_card_info, dict):
-            # 使用直接提供的信息（例如来自后台状态更新）
-            card_id = original_card_info.get("id")
-            # 保留原始日期，除非 card_data 里有新的 (状态更新时不太可能)
-            card_date = card_data.get("date", original_card_info.get("date", datetime.date.today().isoformat()))
-            original_filename = original_card_info.get("filename")
-        else:
-            # 回退到使用 session state 的 UI 编辑逻辑
-            all_cards = load_daily_cards() # 仅在 UI 编辑时加载
-            current_edit_index = st.session_state.get("daily_edit_index")
-            if current_edit_index is None or current_edit_index >= len(all_cards):
-                st.error("保存错误：无效的编辑索引 (UI)。")
-                return False
-            original_card = all_cards[current_edit_index]
-            card_id = original_card.get("id")
-            card_date = original_card.get("date", datetime.date.today().isoformat())
-            original_filename = st.session_state.get("daily_editing_filename")
-
-        if card_id is None:
-            st.error("编辑错误：无法确定每日词卡 ID。")
-            return False
-    else: # 添加新卡片
-        all_cards = load_daily_cards() # 仅在添加新卡片时加载
-        # 使用 max([...], default=-1) + 1 来安全地获取下一个 ID
-        card_id = (max([c.get('id', 0) for c in all_cards], default=-1) + 1) if all_cards else 1
-        card_date = card_data.get("date", datetime.date.today().isoformat()) # 使用提供的数据日期或今天
-        original_filename = None
-
-    card_to_save = {
-        "id": card_id,
-        "date": card_date,
-        "title": card_data.get("title", ""),
-        "data": card_data.get("data", {}),  # 确保 data 存在且是字典
-        "status": card_data.get("status", "未审阅")
-    }
-    if not isinstance(card_to_save["data"], dict):
-         st.warning(f"Card ID {card_id}: 'data' field was not a dictionary, resetting.")
-         card_to_save["data"] = {}
-
-    new_filename = f"{card_to_save['date']}_word_{card_to_save['id']}.json"
-    new_filepath = os.path.join(DAILY_WORD_PATH, new_filename)
-
-    # 仅当文件名实际改变时才删除旧文件
-    if is_editing and original_filename and original_filename != new_filename:
-        old_filepath = os.path.join(DAILY_WORD_PATH, original_filename)
-        if os.path.exists(old_filepath):
-            try:
-                os.remove(old_filepath)
-            except Exception as e:
-                st.warning(f"无法删除旧文件 {original_filename}: {e}")
-
-    try:
-        with open(new_filepath, "w", encoding="utf-8") as f:
-            json.dump(card_to_save, f, ensure_ascii=False, indent=2)
-
-        return True
-    except Exception as e:
-        st.error(f"保存每日词卡 {new_filename} 失败: {e}")
-        return False
+    if is_editing and original_card_info:
+        card_id = original_card_info.get("id")
+        update_data = {
+            "title": card_data.get("title", ""),
+            "phonetic": card_data.get("data", {}).get("音标", ""),
+            "definition": card_data.get("data", {}).get("释义", ""),
+            "example": card_data.get("data", {}).get("例句", ""),
+            "note": card_data.get("data", {}).get("备注", ""),
+            "source": card_data.get("data", {}).get("source", ""),
+            "status": card_data.get("status", "未审阅"),
+            "date": card_data.get("date", original_card_info.get("date"))
+        }
+        res = supabase.table("daily_cards").update(update_data).eq("id", card_id).execute()
+        return res.status_code == 200
+    else:
+        insert_data = {
+            "title": card_data.get("title", ""),
+            "phonetic": card_data.get("data", {}).get("音标", ""),
+            "definition": card_data.get("data", {}).get("释义", ""),
+            "example": card_data.get("data", {}).get("例句", ""),
+            "note": card_data.get("data", {}).get("备注", ""),
+            "source": card_data.get("data", {}).get("source", ""),
+            "status": card_data.get("status", "未审阅"),
+            "date": card_data.get("date", datetime.date.today().isoformat())
+        }
+        res = supabase.table("daily_cards").insert(insert_data).execute()
+        return res.status_code == 201
 # --- 添加这个新函数 ---
 def safe_strip(value):
     return str(value).strip() if value is not None else ""
@@ -419,104 +371,40 @@ for key in tiqiao_form_fields:
 
 
 def load_tiqiao_cards():
-    cards = []
-    tiqiao_path_obj = Path(TIQIAO_DATA_PATH)
-    for fname_path in sorted(tiqiao_path_obj.glob("*.json")):
-        try:
-            with open(fname_path, "r", encoding="utf-8") as f:
-                card = json.load(f)
-            card["_filename"] = fname_path.name
-            cards.append(card)
-        except Exception as e:
-             st.warning(f"加载推敲词卡 {fname_path.name} 失败: {e}")
-    return cards
+    res = supabase.table("tiqiao_cards").select("*").execute()
+    return res.data if res.data else []
 
 def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
-    """
-    保存新卡片或更新现有推敲卡片。
-    original_card_info (dict, optional): 用于在非 UI 编辑场景下提供原始卡片信息。
-                                         应包含 {'id': ..., 'date': ..., 'filename': ...}
-    """
-    card_id = None
-    card_date = None
-    original_filename = None
-
-    if is_editing:
-        if original_card_info and isinstance(original_card_info, dict):
-            card_id = original_card_info.get("id")
-            # 保留原始日期，除非 card_data 里有新的日期
-            card_date = card_data.get("date", original_card_info.get("date", datetime.date.today().isoformat()))
-            original_filename = original_card_info.get("filename")
-        else: # UI edit
-            all_cards = load_tiqiao_cards()
-            current_edit_index = st.session_state.get("tiqiao_edit_index")
-            if current_edit_index is None or current_edit_index >= len(all_cards):
-                st.error("保存错误：无效的推敲词卡编辑索引。")
-                return False
-            original_card = all_cards[current_edit_index]
-            card_id = original_card.get("id")
-            card_date = original_card.get("date", datetime.date.today().isoformat())
-            original_filename = st.session_state.get("tiqiao_editing_filename")
-
-        if card_id is None:
-             st.error("编辑错误：无法确定推敲卡片 ID。")
-             return False
-    else: # New card
-        all_cards = load_tiqiao_cards()
-        card_id = (max([c.get('id', 0) for c in all_cards], default=-1) + 1) if all_cards else 1
-        card_date = card_data.get("date", datetime.date.today().isoformat())
-        original_filename = None
-
-    card_to_save = {
-        "id": card_id, "date": card_date,
-        "orig_cn": card_data.get("orig_cn", ""), "orig_en": card_data.get("orig_en", ""),
-        "meaning": card_data.get("meaning", ""), "recommend": card_data.get("recommend", ""),
-        "qtype": card_data.get("qtype", ""), "status": card_data.get("status", "未审阅")
-    }
-    new_filename = f"{card_to_save['date']}_tiq_{card_to_save['id']}.json"
-    new_filepath = os.path.join(TIQIAO_DATA_PATH, new_filename)
-
-    if is_editing and original_filename and original_filename != new_filename:
-        old_filepath = os.path.join(TIQIAO_DATA_PATH, original_filename)
-        if os.path.exists(old_filepath):
-            try:
-                os.remove(old_filepath)
-            except Exception as e:
-                st.warning(f"无法删除旧推敲文件 {original_filename}: {e}")
-    try:
-        with open(new_filepath, "w", encoding="utf-8") as f:
-            json.dump(card_to_save, f, ensure_ascii=False, indent=2)
-        # Clean up session state only if called from UI edit
-        if is_editing and not original_card_info:
-             if "tiqiao_editing_filename" in st.session_state:
-                 del st.session_state["tiqiao_editing_filename"]
-        return True
-    except Exception as e:
-        st.error(f"保存推敲词卡 {new_filename} 失败: {e}")
-        return False
+    if is_editing and original_card_info:
+        card_id = original_card_info.get("id")
+        update_data = {
+            "orig_cn": card_data.get("orig_cn", ""),
+            "orig_en": card_data.get("orig_en", ""),
+            "meaning": card_data.get("meaning", ""),
+            "recommend": card_data.get("recommend", ""),
+            "qtype": card_data.get("qtype", ""),
+            "status": card_data.get("status", "未审阅"),
+            "date": card_data.get("date", original_card_info.get("date"))
+        }
+        res = supabase.table("tiqiao_cards").update(update_data).eq("id", card_id).execute()
+        return res.status_code == 200
+    else:
+        insert_data = {
+            "orig_cn": card_data.get("orig_cn", ""),
+            "orig_en": card_data.get("orig_en", ""),
+            "meaning": card_data.get("meaning", ""),
+            "recommend": card_data.get("recommend", ""),
+            "qtype": card_data.get("qtype", ""),
+            "status": card_data.get("status", "未审阅"),
+            "date": card_data.get("date", datetime.date.today().isoformat())
+        }
+        res = supabase.table("tiqiao_cards").insert(insert_data).execute()
+        return res.status_code == 201
 # --- 函数替换结束 ---
 
-def delete_tiqiao_card(idx):
-    cards = load_tiqiao_cards()
-    if 0 <= idx < len(cards):
-        card = cards[idx]
-        filename = card.get("_filename")
-        if filename:
-            filepath = os.path.join(TIQIAO_DATA_PATH, filename)
-            if os.path.exists(filepath):
-                try:
-                    os.remove(filepath)
-                    return True
-                except Exception as e:
-                    st.error(f"删除推敲文件 {filename} 失败: {e}")
-                    return False
-            else:
-                st.warning(f"要删除的推敲文件未找到: {filename}")
-                return False
-        else:
-            st.error("无法删除推敲卡片：缺少文件名。")
-            return False
-    return False
+def delete_tiqiao_card(card_id):
+    res = supabase.table("tiqiao_cards").delete().eq("id", card_id).execute()
+    return res.status_code == 200
 def remove_tiqiao_duplicates():
     cards = load_tiqiao_cards()
     seen_content = set()
@@ -754,7 +642,7 @@ for i, state in enumerate(daily_states):
                         msg["Subject"] = f"每日词卡推送 {datetime.date.today()}"
                         msg.attach(MIMEText(body, "plain", "utf-8"))
 
-                        with smtplib.SMTP_SSL("smtp.qiye.163.com", 465) as s:
+                        with smtplib.SMTP_SSL("smtp.feishu.cn", 465) as s:
                             s.login(sender_email_daily, app_password_daily)
                             if not selected_recipients:
                                 st.warning("请选择至少一个收件人。")
@@ -909,7 +797,7 @@ for i, state in enumerate(tiqiao_states):
                         msg.attach(MIMEText(body, "plain", "utf-8"))
 
                         # 建立连接并发送
-                        with smtplib.SMTP_SSL("smtp.qiye.163.com", 465) as s:
+                        with smtplib.SMTP_SSL("smtp.feishu.cn", 465) as s:
                             s.login(sender_email_tiqiao, app_password_tiqiao) # 使用推敲邮箱配置
                             # 处理可能的多个收件人
                             if not selected_recipients:
@@ -1005,7 +893,7 @@ for i, state in enumerate(tiqiao_states):
 
             col2.button("✏️", key=edit_button_key, on_click=tiqiao_start_edit, args=(original_idx, all_tiqiao_cards))
             if col2.button("🗑️", key=delete_button_key):
-                 if delete_tiqiao_card(original_idx):
+                 if delete_tiqiao_card(card.get("id")):
                       st.success(f"删除推敲卡片 ID {card.get('id')} 成功")
                       if st.session_state.tiqiao_edit_index == original_idx:
                           tiqiao_cancel_edit()
