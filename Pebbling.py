@@ -753,14 +753,12 @@ for i, state in enumerate(daily_states):
                 title = card.get('title', '-')
                 card_id = card.get('id', 'N/A')
                 date = card.get('date', '-')
-                phonetic = card.get('data', {}).get('音标', '-')
-                definition = card.get('data', {}).get('释义', '-')
-                example = card.get('data', {}).get('例句', '-')
-                note = card.get('data', {}).get('备注', '-')
+                phonetic = card.get('data', {}).get('音标') or card.get('phonetic', '-') or '-'
+                definition = card.get('data', {}).get('释义') or card.get('definition', '-') or '-'
+                example = card.get('data', {}).get('例句') or card.get('example', '-') or '-'
+                note = card.get('data', {}).get('备注') or card.get('note', '-') or '-'
                 status_val = card.get('status', '未审阅')
-                source = card.get('data', {}).get('source', '')
-
-                # --- 使用 <br> 强制换行 ---
+                source = card.get('data', {}).get('source') or card.get('source', '') or ''
                 display_text = f"""
                 **词条**: {title} `(ID: {card_id})`<br>
                 **日期**: {date}<br>
