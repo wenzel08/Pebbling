@@ -89,6 +89,14 @@ def load_daily_cards():
             card["_filename"] = f"{date}_word_{cid}.json"
     return cards
 
+# --- Daily Card 删除函数 ---
+def delete_daily_card(card_id):
+    res = supabase.table("daily_cards").delete().eq("id", card_id).execute()
+    if hasattr(res, "error") and res.error:
+        st.error(f"Supabase 删除失败: {res.error}")
+        return False
+    return True
+
 # --- 用这个完整的新函数替换掉你原来的 save_daily_card 函数 ---
 def save_daily_card(card_data, is_editing=False, original_card_info=None):
     """保存新的或更新现有的每日词卡。"""
@@ -125,7 +133,7 @@ def save_daily_card(card_data, is_editing=False, original_card_info=None):
             st.error(f"Supabase 插入失败: {res.error}")
             return False
         return True
-# --- 添加这个新函数 ---
+
 def safe_strip(value):
     return str(value).strip() if value is not None else ""
 def remove_daily_duplicates():
