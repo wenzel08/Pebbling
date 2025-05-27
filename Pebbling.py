@@ -194,11 +194,11 @@ def daily_start_edit(idx, all_cards):
         st.session_state.daily_edit_index = idx
         card = all_cards[idx]
         st.session_state.daily_title = card.get("title", "")
-        st.session_state.daily_phonetic = card.get("data", {}).get("音标", "")
-        st.session_state.daily_definition = card.get("data", {}).get("释义", "")
-        st.session_state.daily_example = card.get("data", {}).get("例句", "")
-        st.session_state.daily_note = card.get("data", {}).get("备注", "")
-        st.session_state.daily_source = card.get("data", {}).get("source", "")
+        st.session_state.daily_phonetic = card.get("data", {}).get("音标") or card.get("phonetic", "")
+        st.session_state.daily_definition = card.get("data", {}).get("释义") or card.get("definition", "")
+        st.session_state.daily_example = card.get("data", {}).get("例句") or card.get("example", "")
+        st.session_state.daily_note = card.get("data", {}).get("备注") or card.get("note", "")
+        st.session_state.daily_source = card.get("data", {}).get("source") or card.get("source", "")
         st.session_state.daily_status = card.get("status", "未审阅")
         st.session_state.daily_editing_filename = card.get("_filename")
     else:
@@ -487,11 +487,12 @@ def tiqiao_start_edit(idx, all_cards):
     if 0 <= idx < len(all_cards):
         st.session_state.tiqiao_edit_index = idx
         card = all_cards[idx]
-        st.session_state.tiqiao_orig_cn = card.get("orig_cn", "")
-        st.session_state.tiqiao_orig_en = card.get("orig_en", "")
-        st.session_state.tiqiao_meaning = card.get("meaning", "")
-        st.session_state.tiqiao_recommend = card.get("recommend", "")
-        st.session_state.tiqiao_qtype = card.get("qtype", "")
+        data = card.get("data", {}) or {}
+        st.session_state.tiqiao_orig_cn = data.get("orig_cn") or card.get("orig_cn", "")
+        st.session_state.tiqiao_orig_en = data.get("orig_en") or card.get("orig_en", "")
+        st.session_state.tiqiao_meaning = data.get("meaning") or card.get("meaning", "")
+        st.session_state.tiqiao_recommend = data.get("recommend") or card.get("recommend", "")
+        st.session_state.tiqiao_qtype = data.get("qtype") or card.get("qtype", "")
         st.session_state.tiqiao_status = card.get("status", "未审阅")
         st.session_state.tiqiao_editing_filename = card.get("_filename")
     else:
@@ -667,15 +668,16 @@ for i, state in enumerate(daily_states):
                 else:
                     body = ""
                     for c in cards_to_push:
-                         body += (
+                        data = c.get('data', {}) or {}
+                        body += (
                             f"【{c.get('title','')}】\n"
-                            f"日期: {c.get('date', '-')}\n"
-                            f"音标: {c.get('data',{}).get('音标','')}\n"
-                            f"释义: {c.get('data',{}).get('释义','')}\n"
-                            f"例句: {c.get('data',{}).get('例句','')}\n"
-                            f"备注: {c.get('data',{}).get('备注','')}\n"
-                            f"来源: {c.get('data',{}).get('source','')}\n\n"
-                         )
+                            f"日期: {c.get('date', '-') }\n"
+                            f"音标: {data.get('音标') or c.get('phonetic', '-') or '-'}\n"
+                            f"释义: {data.get('释义') or c.get('definition', '-') or '-'}\n"
+                            f"例句: {data.get('例句') or c.get('example', '-') or '-'}\n"
+                            f"备注: {data.get('备注') or c.get('note', '-') or '-'}\n"
+                            f"来源: {data.get('source') or c.get('source', '') or ''}\n\n"
+                        )
                     if not selected_recipients:
                         st.warning("请选择至少一个收件人。")
                         st.stop()
@@ -825,13 +827,15 @@ for i, state in enumerate(tiqiao_states):
                     # --- 准备邮件内容 ---
                     body = ""
                     for c in cards_to_push:
+                        data = c.get('data', {}) or {}
                         body += (
-                            f"【{c.get('orig_cn','')}】\n"
-                            f"原始英文: {c.get('orig_en','')}\n"
-                            f"真实内涵: {c.get('meaning','')}\n"
-                            f"推荐英文: {c.get('recommend','')}\n"
-                            f"问题类型: {c.get('qtype','')}\n"
-                            f"日期: {c.get('date','')}\n\n"
+                            f"【{c.get('title','')}】\n"
+                            f"日期: {c.get('date', '-') }\n"
+                            f"音标: {data.get('音标') or c.get('phonetic', '-') or '-'}\n"
+                            f"释义: {data.get('释义') or c.get('definition', '-') or '-'}\n"
+                            f"例句: {data.get('例句') or c.get('example', '-') or '-'}\n"
+                            f"备注: {data.get('备注') or c.get('note', '-') or '-'}\n"
+                            f"来源: {data.get('source') or c.get('source', '') or ''}\n\n"
                         )
                     if not selected_recipients:
                         st.warning("请选择至少一个收件人。")
