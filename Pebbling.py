@@ -791,18 +791,9 @@ for i, state in enumerate(daily_states):
                     else:
                         st.error(f"删除词卡 ID {card.get('id')} 失败（请查看上方调试信息）")
 
-if 'last_delete_debug' in st.session_state:
-    st.info(st.session_state['last_delete_debug'])
-if 'last_delete_result' in st.session_state:
-    st.info(st.session_state['last_delete_result'])
-if 'last_delete_error' in st.session_state and st.session_state['last_delete_error']:
-    st.error(st.session_state['last_delete_error'])
-if 'last_delete_success' in st.session_state:
-    if st.session_state['last_delete_success']:
-        st.success('删除操作成功！')
-    elif 'last_delete_error' in st.session_state and st.session_state['last_delete_error']:
-        st.error(st.session_state['last_delete_error'])
-
+# ================================================
+# SECTION 4: MAIN AREA DISPLAY
+# ================================================
 st.divider()
 st.header("✍️ 推敲词卡列表")
 all_tiqiao_cards = load_tiqiao_cards()
