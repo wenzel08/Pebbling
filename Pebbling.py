@@ -115,7 +115,8 @@ def save_daily_card(card_data, is_editing=False, original_card_info=None):
             "note": card_data.get("data", {}).get("备注", ""),
             "source": card_data.get("data", {}).get("source", ""),
             "status": card_data.get("status", "未审阅"),
-            "date": card_data.get("date", original_card_info.get("date"))
+            "date": card_data.get("date", original_card_info.get("date")),
+            "data": card_data.get("data", {})
         }
         res = supabase.table("daily_cards").update(update_data).eq("id", card_id).execute()
         if hasattr(res, "error") and res.error:
@@ -423,7 +424,8 @@ def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
             "recommend": card_data.get("recommend", ""),
             "qtype": card_data.get("qtype", ""),
             "status": card_data.get("status", "未审阅"),
-            "date": card_data.get("date", original_card_info.get("date"))
+            "date": card_data.get("date", original_card_info.get("date")),
+            "data": card_data.get("data", {})
         }
         res = supabase.table("tiqiao_cards").update(update_data).eq("id", card_id).execute()
         if hasattr(res, "error") and res.error:
