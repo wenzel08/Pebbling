@@ -670,7 +670,7 @@ for i, state in enumerate(daily_states):
                 else:
                     body = ""
                     for c in cards_to_push:
-                        data = c.get('data', {}) or {}
+                        data = c.get('data') or {}
                         body += (
                             f"【{c.get('title','')}】\n"
                             f"日期: {c.get('date', '-') }\n"
@@ -757,12 +757,12 @@ for i, state in enumerate(daily_states):
                 title = card.get('title', '-')
                 card_id = card.get('id', 'N/A')
                 date = card.get('date', '-')
-                phonetic = card.get('data', {}).get('音标') or card.get('phonetic', '-') or '-'
-                definition = card.get('data', {}).get('释义') or card.get('definition', '-') or '-'
-                example = card.get('data', {}).get('例句') or card.get('example', '-') or '-'
-                note = card.get('data', {}).get('备注') or card.get('note', '-') or '-'
+                phonetic = (card.get('data') or {}).get('音标') or card.get('phonetic', '-') or '-'
+                definition = (card.get('data') or {}).get('释义') or card.get('definition', '-') or '-'
+                example = (card.get('data') or {}).get('例句') or card.get('example', '-') or '-'
+                note = (card.get('data') or {}).get('备注') or card.get('note', '-') or '-'
                 status_val = card.get('status', '未审阅')
-                source = card.get('data', {}).get('source') or card.get('source', '') or ''
+                source = (card.get('data') or {}).get('source') or card.get('source', '') or ''
                 display_text = f"""
                 **词条**: {title} `(ID: {card_id})`<br>
                 **日期**: {date}<br>
@@ -820,7 +820,7 @@ for i, state in enumerate(tiqiao_states):
                     # --- 准备邮件内容 ---
                     body = ""
                     for c in cards_to_push:
-                        data = c.get('data', {}) or {}
+                        data = c.get('data') or {}
                         body += (
                             f"【{c.get('title','')}】\n"
                             f"日期: {c.get('date', '-') }\n"
