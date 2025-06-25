@@ -109,11 +109,6 @@ def save_daily_card(card_data, is_editing=False, original_card_info=None):
         card_id = original_card_info.get("id")
         update_data = {
             "title": card_data.get("title", ""),
-            "phonetic": card_data.get("data", {}).get("音标", ""),
-            "definition": card_data.get("data", {}).get("释义", ""),
-            "example": card_data.get("data", {}).get("例句", ""),
-            "note": card_data.get("data", {}).get("备注", ""),
-            "source": card_data.get("data", {}).get("source", ""),
             "status": card_data.get("status", "未审阅"),
             "date": card_data.get("date", original_card_info.get("date")),
             "data": card_data.get("data", {})
@@ -126,13 +121,9 @@ def save_daily_card(card_data, is_editing=False, original_card_info=None):
     else:
         insert_data = {
             "title": card_data.get("title", ""),
-            "phonetic": card_data.get("data", {}).get("音标", ""),
-            "definition": card_data.get("data", {}).get("释义", ""),
-            "example": card_data.get("data", {}).get("例句", ""),
-            "note": card_data.get("data", {}).get("备注", ""),
-            "source": card_data.get("data", {}).get("source", ""),
             "status": card_data.get("status", "未审阅"),
-            "date": card_data.get("date", datetime.date.today().isoformat())
+            "date": card_data.get("date", datetime.date.today().isoformat()),
+            "data": card_data.get("data", {})
         }
         res = supabase.table("daily_cards").insert(insert_data).execute()
         if hasattr(res, "error") and res.error:
@@ -418,14 +409,15 @@ def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
     if is_editing and original_card_info:
         card_id = original_card_info.get("id")
         update_data = {
-            "orig_cn": card_data.get("orig_cn", ""),
-            "orig_en": card_data.get("orig_en", ""),
-            "meaning": card_data.get("meaning", ""),
-            "recommend": card_data.get("recommend", ""),
-            "qtype": card_data.get("qtype", ""),
             "status": card_data.get("status", "未审阅"),
             "date": card_data.get("date", original_card_info.get("date")),
-            "data": card_data.get("data", {})
+            "data": {
+                "orig_cn": card_data.get("orig_cn", ""),
+                "orig_en": card_data.get("orig_en", ""),
+                "meaning": card_data.get("meaning", ""),
+                "recommend": card_data.get("recommend", ""),
+                "qtype": card_data.get("qtype", "")
+            }
         }
         res = supabase.table("tiqiao_cards").update(update_data).eq("id", card_id).execute()
         if hasattr(res, "error") and res.error:
@@ -434,13 +426,15 @@ def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
         return True
     else:
         insert_data = {
-            "orig_cn": card_data.get("orig_cn", ""),
-            "orig_en": card_data.get("orig_en", ""),
-            "meaning": card_data.get("meaning", ""),
-            "recommend": card_data.get("recommend", ""),
-            "qtype": card_data.get("qtype", ""),
             "status": card_data.get("status", "未审阅"),
-            "date": card_data.get("date", datetime.date.today().isoformat())
+            "date": card_data.get("date", datetime.date.today().isoformat()),
+            "data": {
+                "orig_cn": card_data.get("orig_cn", ""),
+                "orig_en": card_data.get("orig_en", ""),
+                "meaning": card_data.get("meaning", ""),
+                "recommend": card_data.get("recommend", ""),
+                "qtype": card_data.get("qtype", "")
+            }
         }
         res = supabase.table("tiqiao_cards").insert(insert_data).execute()
         if hasattr(res, "error") and res.error:
