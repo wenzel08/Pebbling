@@ -317,7 +317,19 @@ if daily_submitted:
         },
         "status": st.session_state.daily_status
     }
-    if save_daily_card(card_data, is_editing=daily_is_editing):
+    # 修正：编辑时传递原卡片信息，确保id正确
+    original_card_info = None
+    if daily_is_editing and st.session_state.daily_edit_index is not None:
+        all_cards = load_daily_cards()
+        idx = st.session_state.daily_edit_index
+        if 0 <= idx < len(all_cards):
+            card = all_cards[idx]
+            original_card_info = {
+                "id": card.get("id"),
+                "date": card.get("date"),
+                "filename": card.get("_filename")
+            }
+    if save_daily_card(card_data, is_editing=daily_is_editing, original_card_info=original_card_info):
         msg = "更新成功！" if daily_is_editing else "添加成功！"
         st.sidebar.success(msg)
         daily_cancel_edit()  # Only change session state here
@@ -738,6 +750,86 @@ for i, state in enumerate(daily_states):
                         st.error(f"邮件推送或状态更新失败：{e}")
 # --- try...except 代码块替换结束 ---
 
+        if state == "已审阅":
+            selected_recipients = st.multiselect(
+                "选择推送收件人",
+                recipient_list,
+                default=[recipient_list[0]] if recipient_list else [],
+                key=f"daily_reviewed_recipients_{i}"
+            )
+            if st.button("📬 推送已审阅每日词卡", key=f"daily_push_reviewed_email_tab{i}"):
+                cards_to_push = [c for c in load_daily_cards() if c.get("status") == "已审阅"]
+                if not cards_to_push:
+                    st.warning("没有状态为 '已审阅' 的每日词卡。")
+                else:
+                    body = ""
+                    for c in cards_to_push:
+                        data = c.get('data') or {}
+                        body += (
+                            f"【{c.get('title','')}】\n"
+                            f"日期: {c.get('date', '-') }\n"
+                            f"音标: {data.get('音标') or c.get('phonetic', '-') or '-'}\n"
+                            f"释义: {data.get('释义') or c.get('definition', '-') or '-'}\n"
+                            f"例句: {data.get('例句') or c.get('example', '-') or '-'}\n"
+                            f"备注: {data.get('备注') or c.get('note', '-') or '-'}\n"
+                            f"来源: {data.get('source') or c.get('source', '') or ''}\n\n"
+                        )
+                    if not selected_recipients:
+                        st.warning("请选择至少一个收件人。")
+                        st.stop()
+                    try:
+                        msg = MIMEMultipart()
+                        msg["From"] = sender_email_daily
+                        msg["To"] = ", ".join(selected_recipients)
+                        msg["Subject"] = f"每日词卡推送 {datetime.date.today()}"
+                        msg.attach(MIMEText(body, "plain", "utf-8"))
+
+                        with smtplib.SMTP_SSL("smtp.feishu.cn", 465) as s:
+                            s.login(sender_email_daily, app_password_daily)
+                            if not selected_recipients:
+                                st.warning("请选择至少一个收件人。")
+                                st.stop()
+                            s.sendmail(sender_email_daily, selected_recipients, msg.as_string())
+
+                        # --- 邮件发送成功后，更新卡片状态 ---
+                        saved_count = 0
+                        all_cards_reloaded = load_daily_cards()
+                        updates_to_perform = []
+                        for idx, card in enumerate(all_cards_reloaded):
+                            if not card:
+                                continue
+                            if card.get("status") == "已审阅":
+                                data = card.get("data") or {}
+                                updates_to_perform.append({
+                                    'original_info': {
+                                        "id": card.get("id"),
+                                        "date": card.get("date"),
+                                        "filename": card.get("_filename")
+                                    },
+                                    'updated_data': {
+                                        "title": card.get("title"),
+                                        "data": data,
+                                        "status": "已推送"
+                                    },
+                                    'original_index': idx
+                                })
+                        for update in updates_to_perform:
+                            if save_daily_card(
+                                update['updated_data'],
+                                is_editing=True,
+                                original_card_info=update['original_info']
+                            ):
+                                saved_count += 1
+                            else:
+                                st.warning(f"更新卡片 ID {update['original_info'].get('id')} 状态失败。")
+                        if saved_count == len(updates_to_perform):
+                            st.success(f"成功推送并更新 {saved_count} 条词卡状态！")
+                        else:
+                            st.warning(f"尝试推送 {len(updates_to_perform)} 条，成功更新 {saved_count} 条状态。")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"邮件推送或状态更新失败：{e}")
+
         filtered_daily_cards = [
             (idx, card) for idx, card in enumerate(all_daily_cards)
             if state == "所有" or card.get("status") == state
@@ -758,8 +850,7 @@ for i, state in enumerate(daily_states):
                 status_val = card.get('status', '未审阅')
                 source = (card.get('data') or {}).get('source') or card.get('source', '') or ''
                 display_text = f"""
-                **词条**: {title} `(ID: {card_id})`<br>
-                **日期**: {date}<br>
+                **词条**: {title} <span style='color:#888;'>(ID: {card_id})</span> · <span style='color:#888;'>日期: {date}</span><br>
                 **音标**: {phonetic}<br>
                 **释义**: {definition}<br>
                 **例句**: {example}<br>
