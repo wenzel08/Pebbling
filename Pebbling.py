@@ -441,13 +441,11 @@ def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
         update_data = {
             "status": card_data.get("status", "未审阅"),
             "date": card_data.get("date", original_card_info.get("date")),
-            "data": {
-                "orig_cn": card_data.get("orig_cn", ""),
-                "orig_en": card_data.get("orig_en", ""),
-                "meaning": card_data.get("meaning", ""),
-                "recommend": card_data.get("recommend", ""),
-                "qtype": card_data.get("qtype", "")
-            }
+            "orig_cn": card_data.get("orig_cn", ""),
+            "orig_en": card_data.get("orig_en", ""),
+            "meaning": card_data.get("meaning", ""),
+            "recommend": card_data.get("recommend", ""),
+            "qtype": card_data.get("qtype", "")
         }
         res = supabase.table("tiqiao_cards").update(update_data).eq("id", card_id).execute()
         if hasattr(res, "error") and res.error:
@@ -458,13 +456,11 @@ def save_tiqiao_card(card_data, is_editing=False, original_card_info=None):
         insert_data = {
             "status": card_data.get("status", "未审阅"),
             "date": card_data.get("date", datetime.date.today().isoformat()),
-            "data": {
-                "orig_cn": card_data.get("orig_cn", ""),
-                "orig_en": card_data.get("orig_en", ""),
-                "meaning": card_data.get("meaning", ""),
-                "recommend": card_data.get("recommend", ""),
-                "qtype": card_data.get("qtype", "")
-            }
+            "orig_cn": card_data.get("orig_cn", ""),
+            "orig_en": card_data.get("orig_en", ""),
+            "meaning": card_data.get("meaning", ""),
+            "recommend": card_data.get("recommend", ""),
+            "qtype": card_data.get("qtype", "")
         }
         res = supabase.table("tiqiao_cards").insert(insert_data).execute()
         if hasattr(res, "error") and res.error:
@@ -480,11 +476,10 @@ def remove_tiqiao_duplicates():
 
     # First pass: identify unique cards and their IDs
     for card in cards:
-        data = card.get("data", {}) or {}
         key = (
-            safe_strip(data.get('orig_cn')), safe_strip(data.get('orig_en')),
-            safe_strip(data.get('meaning')), safe_strip(data.get('recommend')),
-            safe_strip(data.get('qtype')),
+            safe_strip(card.get('orig_cn')), safe_strip(card.get('orig_en')),
+            safe_strip(card.get('meaning')), safe_strip(card.get('recommend')),
+            safe_strip(card.get('qtype')),
         )
         # Keep the first occurrence
         if key not in seen_content:
@@ -514,12 +509,11 @@ def tiqiao_start_edit(idx, all_cards):
     if 0 <= idx < len(all_cards):
         st.session_state.tiqiao_edit_index = idx
         card = all_cards[idx]
-        data = card.get("data", {}) or {}
-        st.session_state.tiqiao_orig_cn = data.get("orig_cn") or card.get("orig_cn", "")
-        st.session_state.tiqiao_orig_en = data.get("orig_en") or card.get("orig_en", "")
-        st.session_state.tiqiao_meaning = data.get("meaning") or card.get("meaning", "")
-        st.session_state.tiqiao_recommend = data.get("recommend") or card.get("recommend", "")
-        st.session_state.tiqiao_qtype = data.get("qtype") or card.get("qtype", "")
+        st.session_state.tiqiao_orig_cn = card.get("orig_cn", "")
+        st.session_state.tiqiao_orig_en = card.get("orig_en", "")
+        st.session_state.tiqiao_meaning = card.get("meaning", "")
+        st.session_state.tiqiao_recommend = card.get("recommend", "")
+        st.session_state.tiqiao_qtype = card.get("qtype", "")
         st.session_state.tiqiao_status = card.get("status", "未审阅")
         st.session_state.tiqiao_editing_filename = card.get("_filename")
     else:
@@ -599,13 +593,12 @@ if tiqiao_uploaded_file:
         df = pd.read_excel(tiqiao_uploaded_file, na_filter=False)
         existing_cards = load_tiqiao_cards()
         def tiqiao_key(card):
-            data = card.get("data", {}) or {}
             return (
-                safe_strip(data.get('orig_cn', '')),
-                safe_strip(data.get('orig_en', '')),
-                safe_strip(data.get('meaning', '')),
-                safe_strip(data.get('recommend', '')),
-                safe_strip(data.get('qtype', ''))
+                safe_strip(card.get('orig_cn', '')),
+                safe_strip(card.get('orig_en', '')),
+                safe_strip(card.get('meaning', '')),
+                safe_strip(card.get('recommend', '')),
+                safe_strip(card.get('qtype', ''))
             )
         card_map = {tiqiao_key(c): c for c in existing_cards}
         imported_count = 0
