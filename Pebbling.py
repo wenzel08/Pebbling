@@ -359,11 +359,19 @@ if daily_uploaded_file:
         df = pd.read_excel(daily_uploaded_file, na_filter=False)
         existing_cards = load_daily_cards()
         existing_titles = {c.get("title", "").strip().lower() for c in existing_cards}
+        # 创建标题到现有状态的映射，用于保护已有状态
+        existing_status_map = {c.get("title", "").strip().lower(): c.get("status", "") for c in existing_cards}
         imported_count = 0
         for idx, row in df.iterrows():
             title = str(row.get("Word", "")).strip()
             if not title or title.lower() in existing_titles:
                 continue
+            
+            # 获取Excel中的状态，如果为空则使用默认值
+            excel_status = str(row.get("Status", "")).strip()
+            if not excel_status:
+                excel_status = "未审阅"
+            
             card_data = {
                 "title": title,
                 "data": {
@@ -373,7 +381,7 @@ if daily_uploaded_file:
                     "备注": str(row.get("Note", "")).strip(),
                     "source": str(row.get("Source URL", "")).strip()
                 },
-                "status": str(row.get("Status", "未审阅")).strip()
+                "status": excel_status
             }
             if save_daily_card(card_data, is_editing=False):
                 imported_count += 1
