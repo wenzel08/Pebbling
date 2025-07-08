@@ -358,20 +358,14 @@ if daily_uploaded_file:
     try:
         df = pd.read_excel(daily_uploaded_file, na_filter=False)
         existing_cards = load_daily_cards()
-        existing_titles = {c.get("title", "").strip().lower() for c in existing_cards}
-        # 创建标题到现有状态的映射，用于保护已有状态
-        existing_status_map = {c.get("title", "").strip().lower(): c.get("status", "") for c in existing_cards}
+        title_to_card = {c.get("title", "").strip().lower(): c for c in existing_cards}
         imported_count = 0
+        updated_count = 0
         for idx, row in df.iterrows():
             title = str(row.get("Word", "")).strip()
-            if not title or title.lower() in existing_titles:
+            if not title:
                 continue
-            
-            # 获取Excel中的状态，如果为空则使用默认值
-            excel_status = str(row.get("Status", "")).strip()
-            if not excel_status:
-                excel_status = "未审阅"
-            
+            key = title.lower()
             card_data = {
                 "title": title,
                 "data": {
@@ -380,19 +374,26 @@ if daily_uploaded_file:
                     "例句": str(row.get("Example", "")).strip(),
                     "备注": str(row.get("Note", "")).strip(),
                     "source": str(row.get("Source URL", "")).strip()
-                },
-                "status": excel_status
+                }
             }
-            if save_daily_card(card_data, is_editing=False):
+            if key in title_to_card:
+                # 只更新内容，不覆盖status
+                original = title_to_card[key]
+                card_data["status"] = original.get("status", "未审阅")
+                save_daily_card(card_data, is_editing=True, original_card_info={
+                    "id": original.get("id"),
+                    "date": original.get("date"),
+                    "filename": original.get("_filename")
+                })
+                updated_count += 1
+            else:
+                # 新增
+                card_data["status"] = str(row.get("Status", "未审阅")).strip() or "未审阅"
+                save_daily_card(card_data, is_editing=False)
                 imported_count += 1
-                existing_titles.add(title.lower()) # Add newly imported title
-
-        if imported_count > 0:
-            st.sidebar.success(f"成功导入 {imported_count} 条每日词卡！")
-            daily_clear_form_state() # Clear form after import
-            st.rerun()
-        else:
-            st.sidebar.info("没有新的每日词卡需要导入，或文件格式不符。")
+        st.sidebar.success(f"导入完成：新增 {imported_count} 条，更新 {updated_count} 条。")
+        daily_clear_form_state()
+        st.rerun()
     except Exception as e:
         st.sidebar.error(f"每日词卡导入失败: {e}")
 
@@ -597,58 +598,51 @@ if tiqiao_uploaded_file:
     try:
         df = pd.read_excel(tiqiao_uploaded_file, na_filter=False)
         existing_cards = load_tiqiao_cards()
-        existing_set = set()
-        for c in existing_cards:
-            data = c.get("data", {}) or {}
-            existing_set.add((
-                safe_strip(data.get('orig_cn')), safe_strip(data.get('orig_en')), 
-                safe_strip(data.get('meaning')), safe_strip(data.get('recommend')),
-                safe_strip(data.get('qtype'))
-            ))
+        def tiqiao_key(card):
+            data = card.get("data", {}) or {}
+            return (
+                safe_strip(data.get('orig_cn', '')),
+                safe_strip(data.get('orig_en', '')),
+                safe_strip(data.get('meaning', '')),
+                safe_strip(data.get('recommend', '')),
+                safe_strip(data.get('qtype', ''))
+            )
+        card_map = {tiqiao_key(c): c for c in existing_cards}
         imported_count = 0
-        skipped_count = 0
-
+        updated_count = 0
         for _, row in df.iterrows():
             orig_cn = safe_strip(row.get('原始中文', ''))
             orig_en = safe_strip(row.get('原始英文', ''))
             meaning = safe_strip(row.get('真实内涵', ''))
             recommend = safe_strip(row.get('推荐英文', ''))
             qtype = safe_strip(row.get('问题类型', ''))
-            status = safe_strip(row.get('状态', '未审阅'))
-
-            if not any([orig_cn, orig_en, meaning, recommend, qtype]):
-                skipped_count +=1
-                continue
-
-            content_tuple = (orig_cn, orig_en, meaning, recommend, qtype)
-            if content_tuple in existing_set:
-                skipped_count +=1
-                continue
-
+            key = (orig_cn, orig_en, meaning, recommend, qtype)
             card_data = {
-                'orig_cn': orig_cn, 'orig_en': orig_en, 'meaning': meaning,
-                'recommend': recommend, 'qtype': qtype, 'status': status
+                "orig_cn": orig_cn,
+                "orig_en": orig_en,
+                "meaning": meaning,
+                "recommend": recommend,
+                "qtype": qtype
             }
-
-            if save_tiqiao_card(card_data, is_editing=False):
-                imported_count += 1
-                existing_set.add(content_tuple)
+            if key in card_map:
+                # 只更新内容，不覆盖status
+                original = card_map[key]
+                card_data["status"] = original.get("status", "未审阅")
+                save_tiqiao_card(card_data, is_editing=True, original_card_info={
+                    "id": original.get("id"),
+                    "date": original.get("date")
+                })
+                updated_count += 1
             else:
-                 st.sidebar.warning(f"导入行失败: {row.get('原始中文', '')[:20]}...")
-                 skipped_count += 1
-
-        # --- 检查这里 ---
-        if imported_count > 0:
-            st.sidebar.success(f"成功导入 {imported_count} 条推敲词卡！")
-            # 确认下面这行确实被注释掉或删除了！
-            # tiqiao_clear_form_state()
-            st.rerun() # Rerun 更新界面显示新导入的卡片
-        else:
-            st.sidebar.info(f"没有新的推敲词卡需要导入（跳过 {skipped_count} 行：空行或重复项）。")
-        # --- 检查结束 ---
-
+                # 新增
+                card_data["status"] = safe_strip(row.get("状态", "未审阅")) or "未审阅"
+                save_tiqiao_card(card_data, is_editing=False)
+                imported_count += 1
+        st.sidebar.success(f"导入完成：新增 {imported_count} 条，更新 {updated_count} 条。")
+        tiqiao_clear_form_state()
+        st.rerun()
     except Exception as e:
-        st.sidebar.error(f"推敲词卡导入失败: {type(e).__name__} - {e}") # 显示更详细的错误
+        st.sidebar.error(f"推敲词卡导入失败: {type(e).__name__} - {e}")
 
 # --- 推敲词卡 Excel 上传部分结束 ---
 
