@@ -68,6 +68,7 @@ if "daily_editing_filename" not in st.session_state: st.session_state.daily_edit
 # Add deferred reset flag initialization
 if "should_reset_daily_form" not in st.session_state:
     st.session_state.should_reset_daily_form = False
+# 移除调试信息存储
 
 # Define field list
 daily_form_fields = ["daily_title", "daily_phonetic", "daily_definition", "daily_example", "daily_note", "daily_source", "daily_status"]
@@ -78,8 +79,10 @@ for key in daily_form_fields:
         st.session_state[key] = "" if key != "daily_status" else "未审阅"
 # --- Daily Card Utilities ---
 def load_daily_cards():
-    res = supabase.table("daily_cards").select("*").execute()
+    # 按ID降序排列，获取最新的记录
+    res = supabase.table("daily_cards").select("*").order("id", desc=True).execute()
     cards = res.data if res.data else []
+    
     # 自动补全 _filename 字段（如果有 filename 字段则用之，否则用 id/date 拼接）
     for card in cards:
         if "_filename" not in card or not card["_filename"]:
@@ -317,6 +320,9 @@ if daily_submitted:
         },
         "status": st.session_state.daily_status
     }
+    
+    # 移除调试信息
+    
     # 修正：编辑时传递原卡片信息，确保id正确
     original_card_info = None
     if daily_is_editing and st.session_state.daily_edit_index is not None:
@@ -329,7 +335,10 @@ if daily_submitted:
                 "date": card.get("date"),
                 "filename": card.get("_filename")
             }
-    if save_daily_card(card_data, is_editing=daily_is_editing, original_card_info=original_card_info):
+    
+    save_result = save_daily_card(card_data, is_editing=daily_is_editing, original_card_info=original_card_info)
+    
+    if save_result:
         msg = "更新成功！" if daily_is_editing else "添加成功！"
         st.sidebar.success(msg)
         daily_cancel_edit()  # Only change session state here
@@ -462,15 +471,16 @@ def remove_tiqiao_duplicates():
 
     # First pass: identify unique cards and their IDs
     for card in cards:
-         key = (
-            safe_strip(card.get('orig_cn')), safe_strip(card.get('orig_en')),
-            safe_strip(card.get('meaning')), safe_strip(card.get('recommend')),
-            safe_strip(card.get('qtype')),
-         )
-         # Keep the first occurrence
-         if key not in seen_content:
-             seen_content.add(key)
-             ids_to_keep.add(card.get("id"))
+        data = card.get("data", {}) or {}
+        key = (
+            safe_strip(data.get('orig_cn')), safe_strip(data.get('orig_en')),
+            safe_strip(data.get('meaning')), safe_strip(data.get('recommend')),
+            safe_strip(data.get('qtype')),
+        )
+        # Keep the first occurrence
+        if key not in seen_content:
+            seen_content.add(key)
+            ids_to_keep.add(card.get("id"))
 
     # Second pass: delete cards whose IDs were not marked to keep
     for card in cards:
@@ -579,11 +589,14 @@ if tiqiao_uploaded_file:
     try:
         df = pd.read_excel(tiqiao_uploaded_file, na_filter=False)
         existing_cards = load_tiqiao_cards()
-        existing_set = set(
-            (safe_strip(c.get('orig_cn')), safe_strip(c.get('orig_en')), safe_strip(c.get('meaning')),
-             safe_strip(c.get('recommend')), safe_strip(c.get('qtype')))
-            for c in existing_cards
-        )
+        existing_set = set()
+        for c in existing_cards:
+            data = c.get("data", {}) or {}
+            existing_set.add((
+                safe_strip(data.get('orig_cn')), safe_strip(data.get('orig_en')), 
+                safe_strip(data.get('meaning')), safe_strip(data.get('recommend')),
+                safe_strip(data.get('qtype'))
+            ))
         imported_count = 0
         skipped_count = 0
 
@@ -653,13 +666,15 @@ if st.button("🔄 刷新页面", key="refresh_page_button"):
     st.rerun()
 
 # --- Daily Card Main Area Display ---
-all_daily_cards = load_daily_cards()
 daily_states = ["所有","未审阅","已审阅","待推送","已推送"]
 daily_tabs = st.tabs(daily_states)
 
 for i, state in enumerate(daily_states):
     with daily_tabs[i]:
         st.subheader(f"状态：{state}")
+        
+        # 在每个标签页中重新加载数据
+        all_daily_cards = load_daily_cards()
 
         if state=="待推送":
             # 每日词卡推送收件人选择，使用 [recipients] 里的邮箱
@@ -834,6 +849,7 @@ for i, state in enumerate(daily_states):
             (idx, card) for idx, card in enumerate(all_daily_cards)
             if state == "所有" or card.get("status") == state
         ]
+        
         if not filtered_daily_cards:
             st.info(f"无 '{state}' 状态的每日词卡。")
         else:
@@ -881,13 +897,16 @@ for i, state in enumerate(daily_states):
 # ================================================
 st.divider()
 st.header("✍️ 推敲词卡列表")
-all_tiqiao_cards = load_tiqiao_cards()
 tiqiao_states = ["所有","未审阅","已审阅","待推送","已推送"]
 tiqiao_tabs = st.tabs(tiqiao_states)
 
 for i, state in enumerate(tiqiao_states):
     with tiqiao_tabs[i]:
         st.subheader(f"状态：{state}")
+        
+        # 在每个标签页中重新加载数据
+        all_tiqiao_cards = load_tiqiao_cards()
+        
 # --- 替换推敲词卡列表中的 "待推送" Tab 页处理逻辑 ---
         if state == "待推送":
             # 推敲词卡推送收件人选择，使用 [recipients] 里的邮箱
@@ -907,13 +926,13 @@ for i, state in enumerate(tiqiao_states):
                     for c in cards_to_push:
                         data = c.get('data') or {}
                         body += (
-                            f"【{c.get('title','')}】\n"
+                            f"【推敲词卡】\n"
                             f"日期: {c.get('date', '-') }\n"
-                            f"音标: {data.get('音标') or c.get('phonetic', '-') or '-'}\n"
-                            f"释义: {data.get('释义') or c.get('definition', '-') or '-'}\n"
-                            f"例句: {data.get('例句') or c.get('example', '-') or '-'}\n"
-                            f"备注: {data.get('备注') or c.get('note', '-') or '-'}\n"
-                            f"来源: {data.get('source') or c.get('source', '') or ''}\n\n"
+                            f"原始中文: {data.get('orig_cn') or c.get('orig_cn', '-') or '-'}\n"
+                            f"原始英文: {data.get('orig_en') or c.get('orig_en', '-') or '-'}\n"
+                            f"真实内涵: {data.get('meaning') or c.get('meaning', '-') or '-'}\n"
+                            f"推荐英文: {data.get('recommend') or c.get('recommend', '-') or '-'}\n"
+                            f"问题类型: {data.get('qtype') or c.get('qtype', '-') or '-'}\n\n"
                         )
                     if not selected_recipients:
                         st.warning("请选择至少一个收件人。")
@@ -944,6 +963,7 @@ for i, state in enumerate(tiqiao_states):
                             if not card:
                                 continue
                             if card.get("status") == "待推送":
+                                data = card.get("data", {}) or {}
                                 updates_to_perform.append({
                                     'original_info': {
                                         "id": card.get("id"),
@@ -951,11 +971,11 @@ for i, state in enumerate(tiqiao_states):
                                         "filename": card.get("_filename")
                                     },
                                     'updated_data': {
-                                        "orig_cn": card.get("orig_cn"),
-                                        "orig_en": card.get("orig_en"),
-                                        "meaning": card.get("meaning"),
-                                        "recommend": card.get("recommend"),
-                                        "qtype": card.get("qtype"),
+                                        "orig_cn": data.get("orig_cn") or card.get("orig_cn"),
+                                        "orig_en": data.get("orig_en") or card.get("orig_en"),
+                                        "meaning": data.get("meaning") or card.get("meaning"),
+                                        "recommend": data.get("recommend") or card.get("recommend"),
+                                        "qtype": data.get("qtype") or card.get("qtype"),
                                         "status": "已推送"
                                     }
                                 })
@@ -996,11 +1016,12 @@ for i, state in enumerate(tiqiao_states):
             col1, col2 = st.columns([5,1])
 
             card_id = card.get('id', 'N/A')
-            orig_cn = card.get('orig_cn', '-')
-            orig_en = card.get('orig_en', '-')
-            meaning = card.get('meaning', '-') # 确保 JSON 数据是干净的
-            recommend = card.get('recommend', '-')
-            qtype = card.get('qtype', '-')
+            data = card.get("data", {}) or {}
+            orig_cn = data.get('orig_cn') or card.get('orig_cn', '-')
+            orig_en = data.get('orig_en') or card.get('orig_en', '-')
+            meaning = data.get('meaning') or card.get('meaning', '-')
+            recommend = data.get('recommend') or card.get('recommend', '-')
+            qtype = data.get('qtype') or card.get('qtype', '-')
             status = card.get('status', '未审阅')
             date = card.get('date', '-')
 
@@ -1029,8 +1050,10 @@ for i, state in enumerate(tiqiao_states):
                  else:
                       st.error(f"删除推敲卡片 ID {card.get('id')} 失败（请查看上方调试信息）")
             
+# 移除调试信息显示区域，保持代码简洁
+
 # --- 删除后清理调试信息的按钮 ---
-if st.button("🧹 清除调试信息", key="clear_debug_button"):
+if st.button("🧹 清除调试信息", key="clear_debug_button_main"):
     for k in ['last_delete_debug','last_delete_result','last_delete_error','last_delete_success']:
         if k in st.session_state:
             del st.session_state[k]
