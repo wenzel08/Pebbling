@@ -680,9 +680,9 @@ for i, state in enumerate(daily_states):
                 key=f"daily_recipients_{i}"
             )
             if st.button("📬 推送待处理每日词卡", key=f"daily_push_email_tab{i}"):
-                cards_to_push = [c for c in load_daily_cards() if c.get("status") == "待推送"]
+                cards_to_push = [c for c in load_daily_cards() if c.get("status") in ["待推送", "未审阅"]]
                 if not cards_to_push:
-                    st.warning("没有状态为 '待推送' 的每日词卡。")
+                    st.warning("没有状态为 '待推送' 或 '未审阅' 的每日词卡。")
                 else:
                     body = ""
                     for c in cards_to_push:
@@ -715,14 +715,13 @@ for i, state in enumerate(daily_states):
                             s.sendmail(sender_email_daily, selected_recipients, msg.as_string())
 
                         # --- 邮件发送成功后，更新卡片状态 ---
-                        # (确保下面的代码有正确的缩进，在 try 块内部)
                         saved_count = 0
                         all_cards_reloaded = load_daily_cards() # 加载最新数据
                         updates_to_perform = []
                         for idx, card in enumerate(all_cards_reloaded):
                             if not card:
                                 continue
-                            if card.get("status") == "待推送":
+                            if card.get("status") in ["待推送", "未审阅"]:
                                 data = card.get("data") or {}
                                 updates_to_perform.append({
                                     'original_info': {
@@ -912,9 +911,9 @@ for i, state in enumerate(tiqiao_states):
                 key=f"tiqiao_recipients_{i}"
             )
             if st.button("📬 推送待处理推敲词卡", key=f"tiqiao_push_email_tab{i}"):
-                cards_to_push = [c for c in load_tiqiao_cards() if c.get("status") == "待推送"]
+                cards_to_push = [c for c in load_tiqiao_cards() if c.get("status") in ["待推送", "未审阅"]]
                 if not cards_to_push:
-                    st.warning("没有状态为 '待推送' 的推敲词卡。")
+                    st.warning("没有状态为 '待推送' 或 '未审阅' 的推敲词卡。")
                 else:
                     # --- 准备邮件内容 ---
                     body = ""
@@ -957,7 +956,7 @@ for i, state in enumerate(tiqiao_states):
                         for idx, card in enumerate(all_cards_reloaded):
                             if not card:
                                 continue
-                            if card.get("status") == "待推送":
+                            if card.get("status") in ["待推送", "未审阅"]:
                                 data = card.get("data", {}) or {}
                                 updates_to_perform.append({
                                     'original_info': {
